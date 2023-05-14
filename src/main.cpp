@@ -16,11 +16,12 @@ const double RotorDiameter = 0.8;
 const double pi = 3.14159;
 
 // Define pin
-const int PinDT = 2; // Set this to interrupt
+const int PinDT = 5; // Set this to interrupt
 const int PinBtn = 10;
+const int num_of_state = 3;
 
 volatile unsigned int pulse;
-volatile unsigned short screen_state = 0;
+unsigned short screen_state = 0;
 
 LiquidCrystal_I2C screen(0x27, 16, 2); // Binary: 100111
 // LiquidCrystal_I2C screen2(0x23, 16, 2); // Binary: 100011
@@ -73,17 +74,17 @@ double get_wind_speed()
 void change_state()
 {
     screen.clear();
-    screen_state = (screen_state + 1) % 4;
+    screen_state = (screen_state + 1) % num_of_state;
 }
 
-void display_screen(short state)
+void display_screen()
 {
     // State:
     // 0 : temperature
     // 1 : hunidity
     // 2 : presure
     // 3 : wind speed
-    switch (state)
+    switch (screen_state)
     {
     case 0:
     {
@@ -115,14 +116,14 @@ void display_screen(short state)
         break;
     }
 
-    case 3:
-    {
-        double wind_speed = get_wind_speed();
-        screen.setCursor(13 - num_length(wind_speed),1);
-        screen.print(wind_speed, round_digits);
-        screen.print("m/s");
-        break;
-    }
+    // case 3:
+    // {
+    //     double wind_speed = get_wind_speed();
+    //     screen.setCursor(13 - num_length(wind_speed),1);
+    //     screen.print(wind_speed, round_digits);
+    //     screen.print("m/s");
+    //     break;
+    // }
 
     }
 
@@ -134,12 +135,11 @@ void setup()
     Serial.begin(9600);
 
     // Init rotory
-    pinMode(PinDT,INPUT);
-    attachInterrupt(0, count_pulse, RISING);
+    // pinMode(PinDT,INPUT);
+    // attachInterrupt(0, count_pulse, RISING);
 
     // Init changing button
     pinMode(PinBtn, INPUT_PULLUP);
-    attachInterrupt(0, change_state, RISING);
 
     screen.init();
     // screen2.init();
@@ -166,5 +166,12 @@ void setup()
 
 void loop()
 {
-    display_screen(screen_state);
+    int prevInput = 0;
+    if (prevInput == 0 && digitalRead(PinBtn))
+    {
+        prevInput = 1;
+        change_state();
+        display_screen();
+    }
+    prevInput = digitalRead(PinBtn);
 }
