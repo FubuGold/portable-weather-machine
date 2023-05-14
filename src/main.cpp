@@ -16,11 +16,12 @@ const double RotorDiameter = 0.8;
 const double pi = 3.14159;
 
 // Define pin
-const int PinDT = 5; // Set this to interrupt
+const int PinRotaryA = 5;
+const int PinRotaryB = 6;
 const int PinBtn = 10;
 const int num_of_state = 4;
 
-volatile unsigned int pulse;
+unsigned int pulse = 0;
 unsigned short screen_state = 0;
 int prevInput = 0;
 
@@ -66,10 +67,11 @@ void count_pulse(){
 double get_wind_speed()
 {
     pulse = 0;
-    interrupts();
-    delay(TimeToCount);
+    delay(1000);
     noInterrupts();
-    return pi/30 * pulse * RotorDiameter;
+    double wind_speed = pi/30 * pulse * RotorDiameter;
+    interrupts();
+    return wind_speed;
 }
 
 void change_state()
@@ -140,9 +142,10 @@ void setup()
 {
     Serial.begin(9600);
 
-    // Init rotory
-    // pinMode(PinDT,INPUT);
-    // attachInterrupt(0, count_pulse, RISING);
+    // Init rotary
+    pinMode(PinRotaryA, INPUT);
+    // pinMode(PinRotaryB, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PinRotaryA),count_pulse, RISING);
 
     // Init changing button
     pinMode(PinBtn, INPUT_PULLUP);
