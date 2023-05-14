@@ -18,10 +18,11 @@ const double pi = 3.14159;
 // Define pin
 const int PinDT = 5; // Set this to interrupt
 const int PinBtn = 10;
-const int num_of_state = 3;
+const int num_of_state = 4;
 
 volatile unsigned int pulse;
 unsigned short screen_state = 0;
+int prevInput = 0;
 
 LiquidCrystal_I2C screen(0x27, 16, 2); // Binary: 100111
 // LiquidCrystal_I2C screen2(0x23, 16, 2); // Binary: 100011
@@ -89,6 +90,8 @@ void display_screen()
     case 0:
     {
         double temperature = bmp.readTemperature();
+        screen.setCursor(2,0);
+        screen.print("Temperature");
         screen.setCursor(13 - num_length(temperature), 1); //This mess below should align the text to the right of the screen
         screen.print(temperature, round_digits);
         screen.write(0); screen.print("C"); // °C
@@ -98,6 +101,8 @@ void display_screen()
     case 1:
     {
         double pressure = bmp.readPressure();
+        screen.setCursor(2,0);
+        screen.print("Pressure");
         screen.setCursor(13 - num_length(pressure), 1);
         screen.print(pressure, round_digits);
         screen.print("Pa");
@@ -107,23 +112,24 @@ void display_screen()
     case 2:
     {
         double humidity = dht.readHumidity();
-        if (!isnan(humidity))
-        {
-            screen.setCursor(13 - num_length(humidity), 1);
-            screen.print(humidity, round_digits);
-            screen.print("%");
-        }
+        screen.setCursor(2,0);
+        screen.print("Humidity");
+        screen.setCursor(13 - num_length(humidity), 1);
+        screen.print(humidity, round_digits);
+        screen.print("%");
         break;
     }
 
-    // case 3:
-    // {
-    //     double wind_speed = get_wind_speed();
-    //     screen.setCursor(13 - num_length(wind_speed),1);
-    //     screen.print(wind_speed, round_digits);
-    //     screen.print("m/s");
-    //     break;
-    // }
+    case 3:
+    {
+        double wind_speed = get_wind_speed();
+        screen.setCursor(2,0);
+        screen.print("Wind screen");
+        screen.setCursor(13 - num_length(wind_speed),1);
+        screen.print(wind_speed, round_digits);
+        screen.print("m/s");
+        break;
+    }
 
     }
 
@@ -155,7 +161,7 @@ void setup()
 
     screen.createChar(0, degree);
 
-    screen.setCursor(2, 0);
+    // screen.setCursor(2, 0);
     // screen2.setCursor(6, 0);
     // screen3.setCursor(6, 0);
 
@@ -166,12 +172,11 @@ void setup()
 
 void loop()
 {
-    int prevInput = 0;
-    if (prevInput == 0 && digitalRead(PinBtn))
+    if (prevInput == 0 && !digitalRead(PinBtn))
     {
         prevInput = 1;
         change_state();
-        display_screen();
     }
+    display_screen();
     prevInput = digitalRead(PinBtn);
 }
