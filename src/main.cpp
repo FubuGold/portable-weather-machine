@@ -12,24 +12,22 @@
 
 const int round_digits = 1;
 const int TimeToCount = 1000; // Count every 1 second
-const double RotorDiameter = 0.8;
+const double rotorDiameter = 0.8;
 const double pi = 3.14159;
 
 // Define pin
-const int PinRotaryA = 5;
-const int PinRotaryB = 6;
-const int PinBtn = 10;
+const int PinDT = 8; // Set this to interrupt
+const int PinBtn = 5;
 const int num_of_state = 4;
 
-unsigned int pulse = 0;
+volatile unsigned int pulse;
 unsigned short screen_state = 0;
-int prevInput = 0;
 
 LiquidCrystal_I2C screen(0x27, 16, 2); // Binary: 100111
 // LiquidCrystal_I2C screen2(0x23, 16, 2); // Binary: 100011
 // LiquidCrystal_I2C screen3(0x25, 16, 2); // Binary: 100101
 Adafruit_BMP280 bmp;                    // The address is maybe 0x77 or 0x76, just test both of them ¯\_( ͡° ͜ʖ ͡°)_/¯
-DHT dht(2, DHT21);                      // I have no idea what this is
+DHT dht(10, DHT21);                      // I have no idea what this is
 
 byte degree[8] = {
     0b00000,
@@ -64,20 +62,36 @@ void count_pulse(){
   pulse++;
 }
 
-double get_wind_speed()
-{
-    pulse = 0;
-    delay(1000);
-    noInterrupts();
-    double wind_speed = pi/30 * pulse * RotorDiameter;
-    interrupts();
-    return wind_speed;
-}
-
 void change_state()
 {
     screen.clear();
     screen_state = (screen_state + 1) % num_of_state;
+}
+
+double get_wind_speed()
+{
+    pulse = 0;
+    long prevTime = millis(), curTime = millis(), timeInter = millis();
+    int prevInput = digitalRead(PinDT);
+    while (pulse < 20 && curTime - prevTime < TimeToCount)
+    {
+        if (!digitalRead(PinBtn))
+        {
+            change_state();
+            return 0;
+        }
+        curTime = millis();
+        int curInput = digitalRead(PinDT);
+        if (digitalRead(PinDT) == 1 && prevInput == 0)
+        {
+            pulse++;
+        }
+        timeInter = curTime - prevTime;
+        prevInput = curInput;
+    }
+    if (pulse == 0) return 0;
+    double pulse_per_sec = pulse*1000.0 / timeInter;
+    return pulse * 5.0 * pi * rotorDiameter / (3 * timeInter);
 }
 
 void display_screen()
@@ -92,7 +106,7 @@ void display_screen()
     case 0:
     {
         double temperature = bmp.readTemperature();
-        screen.setCursor(2,0);
+        screen.setCursor(2, 0);
         screen.print("Temperature");
         screen.setCursor(13 - num_length(temperature), 1); //This mess below should align the text to the right of the screen
         screen.print(temperature, round_digits);
@@ -103,7 +117,7 @@ void display_screen()
     case 1:
     {
         double pressure = bmp.readPressure();
-        screen.setCursor(2,0);
+        screen.setCursor(2, 0);
         screen.print("Pressure");
         screen.setCursor(13 - num_length(pressure), 1);
         screen.print(pressure, round_digits);
@@ -114,7 +128,7 @@ void display_screen()
     case 2:
     {
         double humidity = dht.readHumidity();
-        screen.setCursor(2,0);
+        screen.setCursor(2, 0);
         screen.print("Humidity");
         screen.setCursor(13 - num_length(humidity), 1);
         screen.print(humidity, round_digits);
@@ -123,10 +137,10 @@ void display_screen()
     }
 
     case 3:
-    {
+     {
         double wind_speed = get_wind_speed();
         screen.setCursor(2,0);
-        screen.print("Wind screen");
+        screen.print("Wind Speed");
         screen.setCursor(13 - num_length(wind_speed),1);
         screen.print(wind_speed, round_digits);
         screen.print("m/s");
@@ -142,10 +156,9 @@ void setup()
 {
     Serial.begin(9600);
 
-    // Init rotary
-    pinMode(PinRotaryA, INPUT);
-    // pinMode(PinRotaryB, INPUT);
-    attachInterrupt(digitalPinToInterrupt(PinRotaryA),count_pulse, RISING);
+    // Init rotory
+    pinMode(PinDT,INPUT);
+    attachInterrupt(digitalPinToInterrupt(PinDT), count_pulse, RISING);
 
     // Init changing button
     pinMode(PinBtn, INPUT_PULLUP);
@@ -164,7 +177,6 @@ void setup()
 
     screen.createChar(0, degree);
 
-    // screen.setCursor(2, 0);
     // screen2.setCursor(6, 0);
     // screen3.setCursor(6, 0);
 
@@ -175,11 +187,12 @@ void setup()
 
 void loop()
 {
-    if (prevInput == 0 && !digitalRead(PinBtn))
+    if (!digitalRead(PinBtn)
+    )
     {
-        prevInput = 1;
+        while (!digitalRead(PinBtn))
+        {display_screen();}
         change_state();
     }
     display_screen();
-    prevInput = digitalRead(PinBtn);
 }
