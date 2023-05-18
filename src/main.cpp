@@ -17,7 +17,7 @@ const double pi = 3.14159;
 
 // Define pin
 const int PinDT = 8; // Set this to interrupt
-const int PinBtn = 5;
+const int PinBtn = 2;
 const int num_of_state = 4;
 
 volatile unsigned int pulse;
@@ -26,8 +26,8 @@ unsigned short screen_state = 0;
 LiquidCrystal_I2C screen(0x27, 16, 2); // Binary: 100111
 // LiquidCrystal_I2C screen2(0x23, 16, 2); // Binary: 100011
 // LiquidCrystal_I2C screen3(0x25, 16, 2); // Binary: 100101
-Adafruit_BMP280 bmp;                    // The address is maybe 0x77 or 0x76, just test both of them ¯\_( ͡° ͜ʖ ͡°)_/¯
-DHT dht(10, DHT21);                      // I have no idea what this is
+Adafruit_BMP280 bmp; // The address is maybe 0x77 or 0x76, just test both of them ¯\_( ͡° ͜ʖ ͡°)_/¯
+DHT dht(10, DHT22);  // I have no idea what this is
 
 byte degree[8] = {
     0b00000,
@@ -58,10 +58,6 @@ int num_length(double number)
                                                                             // decimal point if there are digits beyond
 }
 
-void count_pulse(){
-  pulse++;
-}
-
 void change_state()
 {
     screen.clear();
@@ -77,7 +73,6 @@ double get_wind_speed()
     {
         if (!digitalRead(PinBtn))
         {
-            change_state();
             return 0;
         }
         curTime = millis();
@@ -89,9 +84,14 @@ double get_wind_speed()
         timeInter = curTime - prevTime;
         prevInput = curInput;
     }
-    if (pulse == 0) return 0;
-    double pulse_per_sec = pulse*1000.0 / timeInter;
-    return pulse * 5.0 * pi * rotorDiameter / (3 * timeInter);
+    Serial.println(pulse);
+    Serial.println(timeInter);
+    if (pulse == 0)
+        return 0;
+    double pulse_per_sec = pulse * 1000.0 / (timeInter);
+    double rpm = pulse_per_sec * 3;
+    // return rpm * pi * rotorDiameter / (30*60);
+    return rpm * 0.003 * 6;
 }
 
 void display_screen()
@@ -108,12 +108,13 @@ void display_screen()
         double temperature = bmp.readTemperature();
         screen.setCursor(2, 0);
         screen.print("Temperature");
-        screen.setCursor(13 - num_length(temperature), 1); //This mess below should align the text to the right of the screen
+        screen.setCursor(13 - num_length(temperature), 1); // This mess below should align the text to the right of the screen
         screen.print(temperature, round_digits);
-        screen.write(0); screen.print("C"); // °C
+        screen.write(0);
+        screen.print("C"); // °C
         break;
     }
-    
+
     case 1:
     {
         double pressure = bmp.readPressure();
@@ -124,7 +125,7 @@ void display_screen()
         screen.print("Pa");
         break;
     }
-    
+
     case 2:
     {
         double humidity = dht.readHumidity();
@@ -137,19 +138,16 @@ void display_screen()
     }
 
     case 3:
-     {
+    {
         double wind_speed = get_wind_speed();
-        screen.setCursor(2,0);
+        screen.setCursor(2, 0);
         screen.print("Wind Speed");
-        screen.setCursor(13 - num_length(wind_speed),1);
+        screen.setCursor(13 - num_length(wind_speed), 1);
         screen.print(wind_speed, round_digits);
         screen.print("m/s");
         break;
     }
-
     }
-
-        
 }
 
 void setup()
@@ -157,8 +155,11 @@ void setup()
     Serial.begin(9600);
 
     // Init rotory
-    pinMode(PinDT,INPUT);
-    attachInterrupt(digitalPinToInterrupt(PinDT), count_pulse, RISING);
+    pinMode(PinDT, INPUT);
+    attachInterrupt(
+        digitalPinToInterrupt(PinDT), []()
+        { pulse++; },
+        RISING);
 
     // Init changing button
     pinMode(PinBtn, INPUT_PULLUP);
@@ -187,11 +188,12 @@ void setup()
 
 void loop()
 {
-    if (!digitalRead(PinBtn)
-    )
+    if (!digitalRead(PinBtn))
     {
         while (!digitalRead(PinBtn))
-        {display_screen();}
+        {
+            display_screen();
+        }
         change_state();
     }
     display_screen();
